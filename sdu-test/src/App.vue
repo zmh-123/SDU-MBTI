@@ -9,7 +9,6 @@ const PAGE_STATE = {
   RESULT: 'RESULT'
 }
 
-const QUIZ_STORAGE_KEY = 'sdu_mbti_h5_state_v2'
 const POSTER_TIMEOUT_MS = 12000
 const POSTER_RETRY_TIMES = 1
 const AUTO_NEXT_DELAY_MS = 140
@@ -311,51 +310,6 @@ const restartQuiz = () => {
   currentStep.value = PAGE_STATE.QUIZ
 }
 
-const saveLocalState = () => {
-  const payload = {
-    currentStep: currentStep.value,
-    currentQuestionIndex: currentQuestionIndex.value,
-    college: userState.college,
-    answers: userState.answers,
-    finalResultCode: finalResultCode.value,
-    finalDimensionScores: finalDimensionScores.value
-  }
-  localStorage.setItem(QUIZ_STORAGE_KEY, JSON.stringify(payload))
-}
-
-const restoreLocalState = () => {
-  try {
-    const raw = localStorage.getItem(QUIZ_STORAGE_KEY)
-    if (!raw) return
-
-    const parsed = JSON.parse(raw)
-
-    if (typeof parsed.college === 'string' && collegeMap[parsed.college]) {
-      userState.college = parsed.college
-    }
-
-    userState.answers = sanitizeAnswers(parsed.answers)
-
-    if (typeof parsed.currentQuestionIndex === 'number') {
-      currentQuestionIndex.value = Math.min(Math.max(parsed.currentQuestionIndex, 0), totalQuestions - 1)
-    }
-
-    if (typeof parsed.finalResultCode === 'string') {
-      finalResultCode.value = parsed.finalResultCode
-    }
-
-    if (parsed.finalDimensionScores && typeof parsed.finalDimensionScores === 'object') {
-      finalDimensionScores.value = parsed.finalDimensionScores
-    }
-
-    if (Object.values(PAGE_STATE).includes(parsed.currentStep)) {
-      currentStep.value = parsed.currentStep
-    }
-  } catch (error) {
-    console.error('恢复本地进度失败:', error)
-  }
-}
-
 const withTimeout = (promise, timeoutMs) =>
   new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('poster_timeout')), timeoutMs)
@@ -461,14 +415,6 @@ const shareResult = async () => {
 }
 
 watch(
-  [currentStep, currentQuestionIndex, () => userState.college, () => userState.answers, finalResultCode, finalDimensionScores],
-  () => {
-    saveLocalState()
-  },
-  { deep: true }
-)
-
-watch(
   () => currentStep.value,
   async (step) => {
     if (step !== PAGE_STATE.RESULT) {
@@ -482,13 +428,20 @@ watch(
   }
 )
 
-onMounted(async () => {
-  restoreLocalState()
+onMounted(() => {
+  // 强制每次从首页开始，避免旧缓存导致直接跳题页。
+  localStorage.removeItem('sdu_mbti_h5_state_v2')
 
-  if (currentStep.value === PAGE_STATE.RESULT) {
-    await nextTick()
-    await generatePoster()
-  }
+  currentStep.value = PAGE_STATE.HOME
+  currentQuestionIndex.value = 0
+  userState.college = ''
+  userState.answers = {}
+
+  finalResultCode.value = ''
+  finalDimensionScores.value = null
+  posterImageBase64.value = ''
+  posterError.value = ''
+  shareFeedback.value = ''
 })
 </script>
 
@@ -498,7 +451,7 @@ onMounted(async () => {
     <div class="bg-orb orb-b" />
 
     <div class="content-wrap w-full max-w-md">
-      <section class="glass-card p-7 sm:p-8">
+      <section class="glass-card hero-card reveal reveal-1 p-7 sm:p-8">
         <div class="text-center">
           <p class="eyebrow">SDU PERSONALITY LAB</p>
           <h1 class="title-main text-4xl sm:text-5xl">
@@ -507,6 +460,12 @@ onMounted(async () => {
           <p class="subtitle-main mt-4 text-base sm:text-lg">
             妖风肆虐，你到底是个什么物种？
           </p>
+
+          <div class="mt-6 flex items-center justify-center gap-2">
+            <span class="meta-pill">16道题</span>
+            <span class="meta-pill">约3分钟</span>
+            <span class="meta-pill">即时海报</span>
+          </div>
         </div>
 
         <div class="mt-8">
@@ -548,7 +507,7 @@ onMounted(async () => {
     <div class="bg-orb orb-c" />
 
     <div class="content-wrap mx-auto w-full max-w-md px-4 pt-6">
-      <section class="glass-card p-4">
+      <section class="glass-card reveal reveal-1 p-4">
         <div class="flex items-center justify-between text-sm font-semibold text-slate-600">
           <p>第 {{ currentQuestion?.id || 1 }}/{{ totalQuestions }} 题</p>
           <p class="text-sky-700">已答 {{ answeredCount }}/{{ totalQuestions }}</p>
@@ -559,7 +518,7 @@ onMounted(async () => {
         </div>
       </section>
 
-      <article v-if="currentQuestion" class="glass-card mt-4 p-5">
+      <article v-if="currentQuestion" class="glass-card reveal reveal-2 mt-4 p-5">
         <h3 class="text-lg font-bold leading-relaxed text-slate-900">
           {{ currentQuestion.id }}. {{ currentQuestion.title }}
         </h3>
@@ -578,7 +537,7 @@ onMounted(async () => {
         </div>
       </article>
 
-      <div class="mt-4 grid grid-cols-2 gap-3">
+      <div class="mt-4 grid grid-cols-2 gap-3 reveal reveal-3">
         <button type="button" @click="goPrevQuestion" :disabled="!canGoPrev" class="cta-ghost py-3" :class="!canGoPrev ? 'is-disabled' : ''">
           上一题
         </button>
@@ -586,6 +545,10 @@ onMounted(async () => {
           下一题
         </button>
       </div>
+
+      <p class="mt-3 text-center text-xs font-medium tracking-wide text-slate-500">
+        已开启自动下一题模式
+      </p>
     </div>
 
     <div class="glass-bottom-bar fixed bottom-0 left-0 right-0 px-4 py-4">
@@ -608,14 +571,14 @@ onMounted(async () => {
     <div class="bg-orb orb-c" />
 
     <div class="content-wrap mx-auto w-full max-w-md">
-      <header class="glass-card p-5 text-center">
+      <header class="glass-card reveal reveal-1 p-5 text-center">
         <p class="eyebrow">YOUR REPORT</p>
         <h2 class="text-2xl font-bold text-slate-900">你的专属鉴定报告</h2>
         <p class="mt-1 text-sm font-semibold text-slate-600">维度码：{{ finalResultCode }} · 类型：{{ finalResultKey }}</p>
         <p v-if="!isMappedResult" class="mt-2 text-xs font-semibold text-rose-600">结果码未命中字典，已使用兜底类型。</p>
       </header>
 
-      <section v-if="resultScoreCards.length" class="glass-card mt-4 p-4">
+      <section v-if="resultScoreCards.length" class="glass-card reveal reveal-2 mt-4 p-4">
         <h3 class="text-base font-bold text-slate-900">四维得分明细</h3>
 
         <div class="mt-3 space-y-3">
@@ -633,9 +596,10 @@ onMounted(async () => {
         </div>
       </section>
 
-      <section class="glass-card mt-4 overflow-hidden p-2">
+      <section class="glass-card reveal reveal-3 mt-4 overflow-hidden p-2">
         <img v-if="posterImageBase64" :src="posterImageBase64" alt="人格测试海报" class="block h-auto w-full rounded-2xl" />
-        <div v-else class="flex h-80 items-center justify-center rounded-2xl bg-slate-100/80 px-6 text-center text-sm font-semibold text-slate-600">
+        <div v-else class="loading-panel flex h-80 flex-col items-center justify-center rounded-2xl px-6 text-center text-sm font-semibold text-slate-600">
+          <span class="loading-ring" />
           {{ isGeneratingPoster ? '正在生成海报...' : '海报准备中，请稍候...' }}
         </div>
       </section>
@@ -672,54 +636,75 @@ onMounted(async () => {
     <div class="absolute -left-[9999px] top-0">
       <div
         ref="posterNode"
-        class="w-[390px] overflow-hidden rounded-2xl border-4 p-8 text-black"
+        class="poster-canvas relative w-[390px] overflow-hidden rounded-2xl border-4 p-8 text-black"
         :style="{ backgroundImage: currentTheme.posterGradient, borderColor: currentTheme.borderColor }"
       >
-        <p class="text-base font-black">{{ selectedCollegeLabel }} 专属鉴定报告</p>
+        <div class="poster-blob poster-blob-a" />
+        <div class="poster-blob poster-blob-b" />
 
-        <h1 class="mt-6 w-full break-words text-center text-6xl font-black uppercase leading-none tracking-tight">
-          {{ posterMainTitle }}
-        </h1>
+        <div class="relative z-10">
+          <p class="text-base font-black">{{ selectedCollegeLabel }} 专属鉴定报告</p>
 
-        <div style="margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;">
-          <span
-            v-for="(tag, idx) in (resultData?.tags || []).slice(0, 3)"
-            :key="`${idx}-${tag}`"
-            :style="{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: currentTheme.tagBg,
-              color: currentTheme.tagColor,
-              minHeight: '38px',
-              maxWidth: '100%',
-              padding: '6px 18px',
-              borderRadius: '999px'
-            }"
-          >
-            <span style="display: block; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 1.25;">
-              {{ tag }}
+          <h1 class="mt-6 w-full break-words text-center text-6xl font-black uppercase leading-none tracking-tight">
+            {{ posterMainTitle }}
+          </h1>
+
+          <div style="margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;">
+            <span
+              v-for="(tag, idx) in (resultData?.tags || []).slice(0, 3)"
+              :key="`${idx}-${tag}`"
+              :style="{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: currentTheme.tagBg,
+                color: currentTheme.tagColor,
+                minHeight: '38px',
+                maxWidth: '100%',
+                padding: '6px 18px',
+                borderRadius: '999px'
+              }"
+            >
+              <span style="display: block; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 1.25;">
+                {{ tag }}
+              </span>
             </span>
-          </span>
-        </div>
+          </div>
 
-        <p class="mt-8 text-base font-semibold leading-relaxed">
-          {{ resultData?.description || '结果描述生成中...' }}
-        </p>
+          <p class="mt-8 text-base font-semibold leading-relaxed">
+            {{ resultData?.description || '结果描述生成中...' }}
+          </p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+:global(:root) {
+  --pf-bg-1: #f8fafc;
+  --pf-bg-2: #eef2ff;
+  --pf-surface: rgba(255, 255, 255, 0.68);
+  --pf-surface-strong: rgba(255, 255, 255, 0.8);
+  --pf-border: rgba(255, 255, 255, 0.8);
+  --pf-text: #0f172a;
+  --pf-text-soft: #64748b;
+  --pf-primary-1: #60a5fa;
+  --pf-primary-2: #5b94f7;
+  --pf-primary-3: #7ab2ff;
+  --pf-shadow-lg: 0 22px 44px rgba(15, 23, 42, 0.12);
+  --pf-shadow-sm: 0 8px 18px rgba(15, 23, 42, 0.08);
+  --pf-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
 .app-shell {
   position: relative;
   isolation: isolate;
   overflow: hidden;
   background:
-    radial-gradient(circle at 12% 6%, rgba(191, 219, 254, 0.55) 0%, rgba(191, 219, 254, 0) 48%),
-    radial-gradient(circle at 88% 14%, rgba(244, 240, 255, 0.65) 0%, rgba(244, 240, 255, 0) 52%),
-    linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    radial-gradient(circle at 12% 6%, rgba(191, 219, 254, 0.5) 0%, rgba(191, 219, 254, 0) 48%),
+    radial-gradient(circle at 88% 14%, rgba(251, 243, 255, 0.62) 0%, rgba(251, 243, 255, 0) 52%),
+    linear-gradient(180deg, var(--pf-bg-1) 0%, var(--pf-bg-2) 100%);
 }
 
 .content-wrap {
@@ -731,8 +716,8 @@ onMounted(async () => {
   position: absolute;
   z-index: 1;
   border-radius: 999px;
-  filter: blur(36px);
-  opacity: 0.78;
+  filter: blur(42px);
+  opacity: 0.72;
 }
 
 .orb-a {
@@ -760,21 +745,51 @@ onMounted(async () => {
 }
 
 .glass-card {
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--pf-border);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: var(--pf-surface);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   box-shadow:
-    0 20px 44px rgba(15, 23, 42, 0.1),
+    var(--pf-shadow-lg),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .glass-bottom-bar {
   border-top: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(248, 250, 252, 0.78);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(248, 250, 252, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.loading-panel {
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.82) 0%, rgba(241, 245, 249, 0.9) 100%);
+}
+
+.loading-ring {
+  width: 28px;
+  height: 28px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.35);
+  border-top-color: rgba(59, 130, 246, 0.8);
+  animation: spin 760ms linear infinite;
+}
+
+.hero-card {
+  border-radius: 28px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.64) 100%);
+}
+
+.meta-pill {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
 }
 
 .eyebrow {
@@ -782,7 +797,7 @@ onMounted(async () => {
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #64748b;
+  color: var(--pf-text-soft);
 }
 
 .title-main {
@@ -790,17 +805,17 @@ onMounted(async () => {
   font-weight: 800;
   line-height: 1.06;
   letter-spacing: -0.03em;
-  color: #0f172a;
+  color: var(--pf-text);
 }
 
 .subtitle-main {
-  color: #475569;
+  color: #51627a;
   line-height: 1.65;
   font-weight: 500;
 }
 
 .hint-text {
-  color: #64748b;
+  color: var(--pf-text-soft);
 }
 
 .glass-input {
@@ -808,12 +823,12 @@ onMounted(async () => {
   appearance: none;
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #0f172a;
+  background: var(--pf-surface-strong);
+  color: var(--pf-text);
   font-size: 15px;
   font-weight: 600;
   padding: 13px 14px;
-  transition: all 0.25s ease;
+  transition: all 0.25s var(--pf-ease);
 }
 
 .glass-input:focus {
@@ -831,7 +846,7 @@ onMounted(async () => {
   font-size: 15px;
   font-weight: 600;
   line-height: 1.55;
-  transition: all 0.25s ease;
+  transition: all 0.25s var(--pf-ease);
 }
 
 .option-btn--idle {
@@ -842,7 +857,7 @@ onMounted(async () => {
 
 .option-btn--active {
   border-color: rgba(96, 165, 250, 0.65);
-  background: linear-gradient(140deg, #dbeafe 0%, #e0e7ff 100%);
+  background: linear-gradient(140deg, #dbeafe 0%, #e8edff 100%);
   color: #1e3a8a;
   box-shadow: 0 10px 22px rgba(96, 165, 250, 0.24);
 }
@@ -854,18 +869,27 @@ onMounted(async () => {
   border-radius: 16px;
   font-size: 15px;
   font-weight: 700;
-  transition: all 0.24s ease;
+  transition: all 0.24s var(--pf-ease);
 }
 
 .cta-primary {
   border: 1px solid rgba(59, 130, 246, 0.25);
   color: #ffffff;
-  background: linear-gradient(135deg, #60a5fa 0%, #4f9cf8 45%, #6ea8ff 100%);
+  background: linear-gradient(135deg, var(--pf-primary-1) 0%, var(--pf-primary-2) 45%, var(--pf-primary-3) 100%);
   box-shadow: 0 14px 28px rgba(59, 130, 246, 0.28);
 }
 
 .cta-primary:hover {
   transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(59, 130, 246, 0.34);
+}
+
+.cta-primary:active,
+.cta-ghost:active,
+.cta-accent:active,
+.cta-soft:active,
+.option-btn:active {
+  transform: scale(0.985);
 }
 
 .cta-ghost {
@@ -876,7 +900,7 @@ onMounted(async () => {
 
 .cta-ghost:hover,
 .cta-soft:hover {
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .cta-accent {
@@ -888,13 +912,119 @@ onMounted(async () => {
 .cta-soft {
   border: 1px solid rgba(148, 163, 184, 0.38);
   color: #0f172a;
-  background: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .is-disabled {
   opacity: 0.46;
   box-shadow: none;
   pointer-events: none;
+}
+
+.poster-canvas {
+  box-shadow: var(--pf-shadow-sm);
+}
+
+.poster-blob {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(22px);
+  opacity: 0.45;
+}
+
+.poster-blob-a {
+  top: -32px;
+  right: -12px;
+  width: 120px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.poster-blob-b {
+  bottom: -26px;
+  left: -20px;
+  width: 140px;
+  height: 140px;
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.reveal {
+  animation: cardEnter 560ms var(--pf-ease) both;
+}
+
+.reveal-1 {
+  animation-delay: 0ms;
+}
+
+.reveal-2 {
+  animation-delay: 70ms;
+}
+
+.reveal-3 {
+  animation-delay: 130ms;
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  .glass-card,
+  .glass-bottom-bar {
+    background: rgba(255, 255, 255, 0.96);
+  }
+}
+
+@media (max-width: 390px) {
+  .bg-orb {
+    filter: blur(28px);
+    opacity: 0.6;
+  }
+
+  .glass-card {
+    border-radius: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    animation: none;
+  }
+
+  .loading-ring {
+    animation: none;
+    border-top-color: rgba(148, 163, 184, 0.35);
+  }
+
+  .bg-orb {
+    display: none;
+  }
+
+  .cta-primary,
+  .cta-ghost,
+  .cta-accent,
+  .cta-soft,
+  .option-btn {
+    transition: none;
+  }
 }
 
 :global(body) {
