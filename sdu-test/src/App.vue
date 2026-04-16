@@ -13,7 +13,6 @@ const POSTER_TIMEOUT_MS = 12000
 const POSTER_RETRY_TIMES = 1
 const AUTO_NEXT_DELAY_MS = 140
 const FALLBACK_RESULT_KEY = 'WEIRDO'
-const VALID_OPTION_VALUES = new Set(['N', 'M', 'G', 'D', 'T', 'C', 'J', 'B'])
 
 const currentStep = ref(PAGE_STATE.HOME)
 const currentQuestionIndex = ref(0)
@@ -73,15 +72,7 @@ const collegeThemeMap = {
     borderColor: '#111827',
     actionColor: '#374151'
   },
-  business: {
-    pageGradient: 'linear-gradient(180deg, #ffedd5 0%, #fed7aa 55%, #fef3c7 100%)',
-    posterGradient: 'linear-gradient(180deg, #fdba74 0%, #fb923c 45%, #fcd34d 100%)',
-    tagBg: '#7c2d12',
-    tagColor: '#ffffff',
-    borderColor: '#7c2d12',
-    actionColor: '#c2410c'
-  },
-  engineering: {
+  ise: {
     pageGradient: 'linear-gradient(180deg, #cffafe 0%, #a5f3fc 55%, #e0f2fe 100%)',
     posterGradient: 'linear-gradient(180deg, #67e8f9 0%, #22d3ee 45%, #93c5fd 100%)',
     tagBg: '#083344',
@@ -89,26 +80,26 @@ const collegeThemeMap = {
     borderColor: '#0e7490',
     actionColor: '#0891b2'
   },
-  science: {
-    pageGradient: 'linear-gradient(180deg, #ede9fe 0%, #ddd6fe 55%, #e9d5ff 100%)',
-    posterGradient: 'linear-gradient(180deg, #c4b5fd 0%, #a78bfa 45%, #d8b4fe 100%)',
-    tagBg: '#4c1d95',
+  life: {
+    pageGradient: 'linear-gradient(180deg, #dcfce7 0%, #bbf7d0 55%, #fef9c3 100%)',
+    posterGradient: 'linear-gradient(180deg, #86efac 0%, #4ade80 45%, #fde047 100%)',
+    tagBg: '#14532d',
     tagColor: '#ffffff',
-    borderColor: '#5b21b6',
-    actionColor: '#6d28d9'
+    borderColor: '#166534',
+    actionColor: '#15803d'
   },
-  humanities: {
-    pageGradient: 'linear-gradient(180deg, #fae8ff 0%, #f5d0fe 55%, #fde68a 100%)',
-    posterGradient: 'linear-gradient(180deg, #f0abfc 0%, #e879f9 45%, #fcd34d 100%)',
-    tagBg: '#701a75',
+  environment: {
+    pageGradient: 'linear-gradient(180deg, #ecfeff 0%, #ccfbf1 55%, #dcfce7 100%)',
+    posterGradient: 'linear-gradient(180deg, #99f6e4 0%, #2dd4bf 45%, #86efac 100%)',
+    tagBg: '#134e4a',
     tagColor: '#ffffff',
-    borderColor: '#701a75',
-    actionColor: '#a21caf'
+    borderColor: '#0f766e',
+    actionColor: '#0f766e'
   },
-  other: {
-    pageGradient: 'linear-gradient(180deg, #fef9c3 0%, #fde68a 55%, #fdba74 100%)',
-    posterGradient: 'linear-gradient(180deg, #fde047 0%, #facc15 45%, #fb923c 100%)',
-    tagBg: '#422006',
+  iit: {
+    pageGradient: 'linear-gradient(180deg, #fef3c7 0%, #fed7aa 55%, #fde68a 100%)',
+    posterGradient: 'linear-gradient(180deg, #fdba74 0%, #f59e0b 45%, #fcd34d 100%)',
+    tagBg: '#78350f',
     tagColor: '#ffffff',
     borderColor: '#78350f',
     actionColor: '#b45309'
@@ -116,34 +107,33 @@ const collegeThemeMap = {
 }
 
 const collegeMap = {
-  cs: '计算机学院',
-  cybersecurity: '网安学院',
-  governance: '政管学院',
+  governance: '政治学与公共管理学院',
   law: '法学院',
-  business: '商学院',
-  engineering: '工程学院',
-  science: '理学院',
-  humanities: '文学院',
-  other: '其他学院'
+  ise: '信息科学与工程学院',
+  cs: '计算机科学与技术学院',
+  life: '生命科学学院',
+  environment: '环境科学与工程学院',
+  cybersecurity: '网络空间安全学院（研究院）',
+  iit: '国际创新转化学院'
 }
 
 const resultCodeMap = {
-  NGTJ: 'CEO',
-  NGTB: 'MONKEY',
-  NGCJ: 'MOM',
-  NGCB: 'FLOWER',
-  NDTJ: 'SCAMMER',
-  NDTB: 'TROLL',
-  NDCJ: 'SAINT',
-  NDCB: 'PUPPY',
-  MGTJ: 'BOT',
-  MGTB: 'GHOST',
-  MGCJ: 'DOORMAT',
-  MGCB: 'CUTE',
-  MDTJ: 'HATER',
-  MDTB: 'WEIRDO',
-  MDCJ: 'MONK',
-  MDCB: 'WATER'
+  ESTJ: 'CEO',
+  ESTP: 'MONKEY',
+  ESFJ: 'MOM',
+  ESFP: 'FLOWER',
+  ENTJ: 'SCAMMER',
+  ENTP: 'TROLL',
+  ENFJ: 'SAINT',
+  ENFP: 'PUPPY',
+  ISTJ: 'BOT',
+  ISTP: 'GHOST',
+  ISFJ: 'DOORMAT',
+  ISFP: 'CUTE',
+  INTJ: 'HATER',
+  INTP: 'WEIRDO',
+  INFJ: 'MONK',
+  INFP: 'WATER'
 }
 
 const totalQuestions = quizQuestions.length
@@ -155,8 +145,8 @@ const quizProgressPercent = computed(() => Math.round((answeredCount.value / tot
 
 const currentQuestion = computed(() => quizQuestions[currentQuestionIndex.value] || null)
 const currentAnswer = computed(() => {
-  if (!currentQuestion.value) return ''
-  return userState.answers[currentQuestion.value.id] || ''
+  if (!currentQuestion.value) return null
+  return userState.answers[currentQuestion.value.id] || null
 })
 const canGoPrev = computed(() => currentQuestionIndex.value > 0)
 const canGoNext = computed(() => currentQuestionIndex.value < totalQuestions - 1)
@@ -185,23 +175,12 @@ const resultScoreCards = computed(() => {
   }
 
   return [
-    toCard('能量场', 'N', 'M', score.energyField.N, score.energyField.M, score.energyWinner),
-    toCard('精神状态', 'G', 'D', score.mentalState.G, score.mentalState.D, score.mentalWinner),
-    toCard('抗压防御', 'T', 'C', score.stressResistance.T, score.stressResistance.C, score.stressWinner),
-    toCard('行动力', 'J', 'B', score.actionDrive.J, score.actionDrive.B, score.actionWinner)
+    toCard('能量场', 'E', 'I', score.energyField.E, score.energyField.I, score.energyWinner),
+    toCard('精神状态', 'S', 'N', score.informationStyle.S, score.informationStyle.N, score.informationWinner),
+    toCard('防御力', 'T', 'F', score.decisionStyle.T, score.decisionStyle.F, score.decisionWinner),
+    toCard('行动力', 'J', 'P', score.actionDrive.J, score.actionDrive.P, score.actionWinner)
   ]
 })
-
-const sanitizeAnswers = (rawAnswers) => {
-  const cleaned = {}
-  for (const question of quizQuestions) {
-    const rawValue = rawAnswers?.[question.id] ?? rawAnswers?.[String(question.id)]
-    if (VALID_OPTION_VALUES.has(rawValue)) {
-      cleaned[question.id] = rawValue
-    }
-  }
-  return cleaned
-}
 
 const jumpToFirstUnanswered = () => {
   const firstUnansweredIndex = quizQuestions.findIndex((q) => !userState.answers[q.id])
@@ -214,8 +193,8 @@ const pickDimensionWinner = (aCode, aScore, bCode, bScore, questionIds) => {
 
   // 平票规则：优先取该维度最后一题的作答，仍取不到时默认左侧字母。
   for (let i = questionIds.length - 1; i >= 0; i--) {
-    const answer = userState.answers[questionIds[i]]
-    if (answer === aCode || answer === bCode) return answer
+    const answerTarget = userState.answers[questionIds[i]]?.target
+    if (answerTarget === aCode || answerTarget === bCode) return answerTarget
   }
   return aCode
 }
@@ -224,41 +203,43 @@ const calculateResult = () => {
   if (!isAllAnswered.value) return
 
   const score = {
-    energyField: { N: 0, M: 0 },
-    mentalState: { G: 0, D: 0 },
-    stressResistance: { T: 0, C: 0 },
-    actionDrive: { J: 0, B: 0 }
+    energyField: { E: 0, I: 0 },
+    informationStyle: { S: 0, N: 0 },
+    decisionStyle: { T: 0, F: 0 },
+    actionDrive: { J: 0, P: 0 }
   }
 
   for (let questionId = 1; questionId <= totalQuestions; questionId++) {
     const answer = userState.answers[questionId]
-    if (!answer) continue
+    const answerTarget = answer?.target
+    const answerWeight = answer?.weight === 2 ? 2 : answer?.weight === 1 ? 1 : 0
+    if (!answerTarget || !answerWeight) continue
 
-    if (questionId >= 1 && questionId <= 4 && (answer === 'N' || answer === 'M')) {
-      score.energyField[answer]++
-    } else if (questionId >= 5 && questionId <= 8 && (answer === 'G' || answer === 'D')) {
-      score.mentalState[answer]++
-    } else if (questionId >= 9 && questionId <= 12 && (answer === 'T' || answer === 'C')) {
-      score.stressResistance[answer]++
-    } else if (questionId >= 13 && questionId <= 16 && (answer === 'J' || answer === 'B')) {
-      score.actionDrive[answer]++
+    if (questionId >= 1 && questionId <= 4 && (answerTarget === 'E' || answerTarget === 'I')) {
+      score.energyField[answerTarget] += answerWeight
+    } else if (questionId >= 5 && questionId <= 8 && (answerTarget === 'S' || answerTarget === 'N')) {
+      score.informationStyle[answerTarget] += answerWeight
+    } else if (questionId >= 9 && questionId <= 12 && (answerTarget === 'T' || answerTarget === 'F')) {
+      score.decisionStyle[answerTarget] += answerWeight
+    } else if (questionId >= 13 && questionId <= 16 && (answerTarget === 'J' || answerTarget === 'P')) {
+      score.actionDrive[answerTarget] += answerWeight
     }
   }
 
-  const energyWinner = pickDimensionWinner('N', score.energyField.N, 'M', score.energyField.M, [1, 2, 3, 4])
-  const mentalWinner = pickDimensionWinner('G', score.mentalState.G, 'D', score.mentalState.D, [5, 6, 7, 8])
-  const stressWinner = pickDimensionWinner('T', score.stressResistance.T, 'C', score.stressResistance.C, [9, 10, 11, 12])
-  const actionWinner = pickDimensionWinner('J', score.actionDrive.J, 'B', score.actionDrive.B, [13, 14, 15, 16])
+  const energyWinner = pickDimensionWinner('E', score.energyField.E, 'I', score.energyField.I, [1, 2, 3, 4])
+  const informationWinner = pickDimensionWinner('S', score.informationStyle.S, 'N', score.informationStyle.N, [5, 6, 7, 8])
+  const decisionWinner = pickDimensionWinner('T', score.decisionStyle.T, 'F', score.decisionStyle.F, [9, 10, 11, 12])
+  const actionWinner = pickDimensionWinner('J', score.actionDrive.J, 'P', score.actionDrive.P, [13, 14, 15, 16])
 
   finalDimensionScores.value = {
     ...score,
     energyWinner,
-    mentalWinner,
-    stressWinner,
+    informationWinner,
+    decisionWinner,
     actionWinner
   }
 
-  finalResultCode.value = [energyWinner, mentalWinner, stressWinner, actionWinner].join('')
+  finalResultCode.value = [energyWinner, informationWinner, decisionWinner, actionWinner].join('')
   currentStep.value = PAGE_STATE.RESULT
 }
 
@@ -268,8 +249,15 @@ const startQuiz = () => {
   currentStep.value = PAGE_STATE.QUIZ
 }
 
-const selectAnswer = (questionId, value) => {
-  userState.answers[questionId] = value
+const selectAnswer = (questionId, option, optionIndex) => {
+  const normalizedWeight = option?.weight === 2 ? 2 : option?.weight === 1 ? 1 : 0
+  if (!option?.target || !normalizedWeight) return
+
+  userState.answers[questionId] = {
+    target: option.target,
+    weight: normalizedWeight,
+    optionIndex
+  }
 
   if (currentStep.value !== PAGE_STATE.QUIZ) return
   if (currentQuestion.value?.id !== questionId) return
@@ -474,15 +462,14 @@ onMounted(() => {
           </label>
           <select id="college-select" v-model="userState.college" class="glass-input">
             <option value="">-- 选择学院 --</option>
-            <option value="cs">计算机学院</option>
-            <option value="cybersecurity">网安学院</option>
-            <option value="governance">政管学院</option>
+            <option value="governance">政治学与公共管理学院</option>
             <option value="law">法学院</option>
-            <option value="business">商学院</option>
-            <option value="engineering">工程学院</option>
-            <option value="science">理学院</option>
-            <option value="humanities">文学院</option>
-            <option value="other">其他学院</option>
+            <option value="ise">信息科学与工程学院</option>
+            <option value="cs">计算机科学与技术学院</option>
+            <option value="life">生命科学学院</option>
+            <option value="environment">环境科学与工程学院</option>
+            <option value="cybersecurity">网络空间安全学院（研究院）</option>
+            <option value="iit">国际创新转化学院</option>
           </select>
         </div>
 
@@ -525,12 +512,12 @@ onMounted(() => {
 
         <div class="mt-4 grid grid-cols-1 gap-3">
           <button
-            v-for="option in currentQuestion.options"
-            :key="option.value"
+            v-for="(option, optionIndex) in currentQuestion.options"
+            :key="`${currentQuestion.id}-${optionIndex}`"
             type="button"
-            @click="selectAnswer(currentQuestion.id, option.value)"
+            @click="selectAnswer(currentQuestion.id, option, optionIndex)"
             class="option-btn"
-            :class="currentAnswer === option.value ? 'option-btn--active' : 'option-btn--idle'"
+            :class="currentAnswer?.optionIndex === optionIndex ? 'option-btn--active' : 'option-btn--idle'"
           >
             {{ option.text }}
           </button>
@@ -574,7 +561,8 @@ onMounted(() => {
       <header class="glass-card reveal reveal-1 p-5 text-center">
         <p class="eyebrow">YOUR REPORT</p>
         <h2 class="text-2xl font-bold text-slate-900">你的专属鉴定报告</h2>
-        <p class="mt-1 text-sm font-semibold text-slate-600">维度码：{{ finalResultCode }} · 类型：{{ finalResultKey }}</p>
+        <p class="mt-1 text-sm font-semibold text-slate-600">MBTI：{{ finalResultCode }} · 英文代号：{{ finalResultKey }}</p>
+        <p class="mt-2 text-base font-bold text-slate-900">中文称号：{{ resultData?.title }}</p>
         <p v-if="!isMappedResult" class="mt-2 text-xs font-semibold text-rose-600">结果码未命中字典，已使用兜底类型。</p>
       </header>
 
@@ -649,25 +637,31 @@ onMounted(() => {
             {{ posterMainTitle }}
           </h1>
 
+          <p class="mt-3 w-full text-center text-xl font-black">
+            {{ resultData?.title }}
+          </p>
+
           <div style="margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;">
             <span
               v-for="(tag, idx) in (resultData?.tags || []).slice(0, 3)"
               :key="`${idx}-${tag}`"
               :style="{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                display: 'inline-block',
                 background: currentTheme.tagBg,
                 color: currentTheme.tagColor,
-                minHeight: '38px',
+                height: '40px',
+                lineHeight: '40px',
                 maxWidth: '100%',
-                padding: '6px 18px',
-                borderRadius: '999px'
+                padding: '0 18px',
+                borderRadius: '999px',
+                whiteSpace: 'nowrap',
+                fontSize: '14px',
+                fontWeight: '700',
+                verticalAlign: 'top',
+                boxSizing: 'border-box'
               }"
             >
-              <span style="display: block; white-space: nowrap; font-size: 14px; font-weight: 700; line-height: 1.25;">
-                {{ tag }}
-              </span>
+              {{ tag }}
             </span>
           </div>
 
