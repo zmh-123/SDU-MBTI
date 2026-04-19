@@ -2,6 +2,7 @@
 import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
 import html2canvas from 'html2canvas'
 import { quizQuestions, quizResults } from '../../src/data/quizData.js'
+import fallbackResultImage from './assets/hero.png'
 
 const PAGE_STATE = {
   HOME: 'HOME',
@@ -13,6 +14,7 @@ const POSTER_TIMEOUT_MS = 12000
 const POSTER_RETRY_TIMES = 1
 const AUTO_NEXT_DELAY_MS = 140
 const FALLBACK_RESULT_KEY = 'WEIRDO'
+const RESULT_IMAGE_BASE_DIR = '/personas'
 
 const currentStep = ref(PAGE_STATE.HOME)
 const currentQuestionIndex = ref(0)
@@ -30,6 +32,7 @@ const posterImageBase64 = ref('')
 const isGeneratingPoster = ref(false)
 const posterError = ref('')
 const shareFeedback = ref('')
+const useFallbackResultImage = ref(false)
 
 const collegeThemeMap = {
   default: {
@@ -156,6 +159,11 @@ const isMappedResult = computed(() => Boolean(resultCodeMap[finalResultCode.valu
 const finalResultKey = computed(() => resultCodeMap[finalResultCode.value] || FALLBACK_RESULT_KEY)
 const resultData = computed(() => quizResults[finalResultKey.value] || quizResults[FALLBACK_RESULT_KEY])
 const posterMainTitle = computed(() => finalResultKey.value || finalResultCode.value || FALLBACK_RESULT_KEY)
+const resultImageSrc = computed(() => {
+  const imageName = resultData.value?.image
+  if (!imageName || useFallbackResultImage.value) return fallbackResultImage
+  return `${RESULT_IMAGE_BASE_DIR}/${encodeURIComponent(imageName)}`
+})
 
 const resultScoreCards = computed(() => {
   const score = finalDimensionScores.value
@@ -402,6 +410,12 @@ const shareResult = async () => {
   }
 }
 
+const handleResultImageError = () => {
+  if (!useFallbackResultImage.value) {
+    useFallbackResultImage.value = true
+  }
+}
+
 watch(
   () => currentStep.value,
   async (step) => {
@@ -413,6 +427,13 @@ watch(
       await nextTick()
       await generatePoster()
     }
+  }
+)
+
+watch(
+  () => resultData.value?.image,
+  () => {
+    useFallbackResultImage.value = false
   }
 )
 
@@ -566,6 +587,21 @@ onMounted(() => {
         <p v-if="!isMappedResult" class="mt-2 text-xs font-semibold text-rose-600">结果码未命中字典，已使用兜底类型。</p>
       </header>
 
+      <section class="glass-card reveal reveal-2 mt-4 p-4">
+        <div class="relative mx-auto w-full max-w-[22rem]">
+          <div class="pointer-events-none absolute inset-x-8 -bottom-5 h-16 rounded-full bg-zinc-900/45 opacity-40 blur-2xl" />
+
+          <div class="relative isolate aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-900/50 p-2 ring-1 ring-white/10 shadow-2xl shadow-black/50 backdrop-blur-md">
+            <img
+              :src="resultImageSrc"
+              :alt="`${resultData?.title || finalResultKey} 人格形象`"
+              class="h-full w-full rounded-xl object-cover object-center mix-blend-screen"
+              @error="handleResultImageError"
+            />
+          </div>
+        </div>
+      </section>
+
       <section v-if="resultScoreCards.length" class="glass-card reveal reveal-2 mt-4 p-4">
         <h3 class="text-base font-bold text-slate-900">四维得分明细</h3>
 
@@ -640,6 +676,19 @@ onMounted(() => {
           <p class="mt-3 w-full text-center text-xl font-black">
             {{ resultData?.title }}
           </p>
+
+          <div class="relative mx-auto mt-6 w-full max-w-[320px]">
+            <div class="pointer-events-none absolute inset-x-6 -bottom-4 h-14 rounded-full bg-zinc-900/45 opacity-40 blur-2xl" />
+
+            <div class="relative isolate aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-900/55 p-2 ring-1 ring-white/10 shadow-2xl shadow-black/50 backdrop-blur-md">
+              <img
+                :src="resultImageSrc"
+                :alt="`${posterMainTitle} 人格形象`"
+                class="h-full w-full rounded-xl object-cover object-center mix-blend-screen"
+                @error="handleResultImageError"
+              />
+            </div>
+          </div>
 
           <div style="margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;">
             <span
