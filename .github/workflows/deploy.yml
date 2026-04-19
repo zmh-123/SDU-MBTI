@@ -31,14 +31,16 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+        working-directory: ./sdu-test
       - name: Build
         run: npm run build
+        working-directory: ./sdu-test
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: './sdu-test/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
