@@ -14,7 +14,8 @@ const POSTER_TIMEOUT_MS = 12000
 const POSTER_RETRY_TIMES = 1
 const AUTO_NEXT_DELAY_MS = 140
 const FALLBACK_RESULT_KEY = 'WEIRDO'
-const RESULT_IMAGE_BASE_DIR = '/personas'
+const ASSET_BASE_URL = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
+const RESULT_IMAGE_BASE_DIR = `${ASSET_BASE_URL}personas`
 
 const currentStep = ref(PAGE_STATE.HOME)
 const currentQuestionIndex = ref(0)
