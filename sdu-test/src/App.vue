@@ -20,12 +20,12 @@ const currentStep = ref(PAGE_STATE.HOME)
 const currentQuestionIndex = ref(0)
 
 const userState = reactive({
-  college: '',
   answers: {}
 })
 
 const finalResultCode = ref('')
 const finalDimensionScores = ref(null)
+const resultGeneratedAt = ref(null)
 
 const posterNode = ref(null)
 const posterImageBase64 = ref('')
@@ -33,92 +33,6 @@ const isGeneratingPoster = ref(false)
 const posterError = ref('')
 const shareFeedback = ref('')
 const useFallbackResultImage = ref(false)
-
-const collegeThemeMap = {
-  default: {
-    pageGradient: 'linear-gradient(180deg, #fee2e2 0%, #ffedd5 50%, #fef9c3 100%)',
-    posterGradient: 'linear-gradient(180deg, #fde047 0%, #fdba74 50%, #fca5a5 100%)',
-    tagBg: '#000000',
-    tagColor: '#ffffff',
-    borderColor: '#111827',
-    actionColor: '#111827'
-  },
-  cs: {
-    pageGradient: 'linear-gradient(180deg, #dbeafe 0%, #bfdbfe 55%, #e0f2fe 100%)',
-    posterGradient: 'linear-gradient(180deg, #93c5fd 0%, #60a5fa 45%, #bae6fd 100%)',
-    tagBg: '#0f172a',
-    tagColor: '#ffffff',
-    borderColor: '#0f172a',
-    actionColor: '#1d4ed8'
-  },
-  cybersecurity: {
-    pageGradient: 'linear-gradient(180deg, #dcfce7 0%, #bbf7d0 55%, #ecfccb 100%)',
-    posterGradient: 'linear-gradient(180deg, #86efac 0%, #4ade80 45%, #bef264 100%)',
-    tagBg: '#052e16',
-    tagColor: '#ffffff',
-    borderColor: '#14532d',
-    actionColor: '#15803d'
-  },
-  governance: {
-    pageGradient: 'linear-gradient(180deg, #fee2e2 0%, #fecaca 55%, #ffedd5 100%)',
-    posterGradient: 'linear-gradient(180deg, #fca5a5 0%, #f87171 45%, #fdba74 100%)',
-    tagBg: '#7f1d1d',
-    tagColor: '#ffffff',
-    borderColor: '#7f1d1d',
-    actionColor: '#b91c1c'
-  },
-  law: {
-    pageGradient: 'linear-gradient(180deg, #e5e7eb 0%, #d1d5db 50%, #f3f4f6 100%)',
-    posterGradient: 'linear-gradient(180deg, #d1d5db 0%, #9ca3af 45%, #e5e7eb 100%)',
-    tagBg: '#111827',
-    tagColor: '#ffffff',
-    borderColor: '#111827',
-    actionColor: '#374151'
-  },
-  ise: {
-    pageGradient: 'linear-gradient(180deg, #cffafe 0%, #a5f3fc 55%, #e0f2fe 100%)',
-    posterGradient: 'linear-gradient(180deg, #67e8f9 0%, #22d3ee 45%, #93c5fd 100%)',
-    tagBg: '#083344',
-    tagColor: '#ffffff',
-    borderColor: '#0e7490',
-    actionColor: '#0891b2'
-  },
-  life: {
-    pageGradient: 'linear-gradient(180deg, #dcfce7 0%, #bbf7d0 55%, #fef9c3 100%)',
-    posterGradient: 'linear-gradient(180deg, #86efac 0%, #4ade80 45%, #fde047 100%)',
-    tagBg: '#14532d',
-    tagColor: '#ffffff',
-    borderColor: '#166534',
-    actionColor: '#15803d'
-  },
-  environment: {
-    pageGradient: 'linear-gradient(180deg, #ecfeff 0%, #ccfbf1 55%, #dcfce7 100%)',
-    posterGradient: 'linear-gradient(180deg, #99f6e4 0%, #2dd4bf 45%, #86efac 100%)',
-    tagBg: '#134e4a',
-    tagColor: '#ffffff',
-    borderColor: '#0f766e',
-    actionColor: '#0f766e'
-  },
-  iit: {
-    pageGradient: 'linear-gradient(180deg, #fef3c7 0%, #fed7aa 55%, #fde68a 100%)',
-    posterGradient: 'linear-gradient(180deg, #fdba74 0%, #f59e0b 45%, #fcd34d 100%)',
-    tagBg: '#78350f',
-    tagColor: '#ffffff',
-    borderColor: '#78350f',
-    actionColor: '#b45309'
-  }
-}
-
-const collegeMap = {
-  governance: '政治学与公共管理学院',
-  law: '法学院',
-  ise: '信息科学与工程学院',
-  cs: '计算机科学与技术学院',
-  life: '生命科学学院',
-  environment: '环境科学与工程学院',
-  cybersecurity: '网络空间安全学院（研究院）',
-  iit: '国际创新转化学院'
-}
 
 const resultCodeMap = {
   ESTJ: 'CEO',
@@ -140,7 +54,6 @@ const resultCodeMap = {
 }
 
 const totalQuestions = quizQuestions.length
-const selectedCollegeLabel = computed(() => collegeMap[userState.college] || '未选择学院')
 const answeredCount = computed(() => quizQuestions.reduce((count, q) => count + (userState.answers[q.id] ? 1 : 0), 0))
 const remainingCount = computed(() => totalQuestions - answeredCount.value)
 const isAllAnswered = computed(() => answeredCount.value === totalQuestions)
@@ -153,14 +66,14 @@ const currentAnswer = computed(() => {
 })
 const canGoPrev = computed(() => currentQuestionIndex.value > 0)
 const canGoNext = computed(() => currentQuestionIndex.value < totalQuestions - 1)
-const currentTheme = computed(() => collegeThemeMap[userState.college] || collegeThemeMap.default)
 
+// 计算结果的核心函数，遍历用户的每个回答，根据题目所属维度和选项权重累加分数，最后根据得分情况确定每个维度的胜出类型。
 const isMappedResult = computed(() => Boolean(resultCodeMap[finalResultCode.value]))
 const finalResultKey = computed(() => resultCodeMap[finalResultCode.value] || FALLBACK_RESULT_KEY)
-const resultData = computed(() => quizResults[finalResultKey.value] || quizResults[FALLBACK_RESULT_KEY])
+const finalResultData = computed(() => quizResults[finalResultKey.value] || quizResults[FALLBACK_RESULT_KEY])
 const posterMainTitle = computed(() => finalResultKey.value || finalResultCode.value || FALLBACK_RESULT_KEY)
 const resultImageSrc = computed(() => {
-  const imageName = resultData.value?.image
+  const imageName = finalResultData.value?.image
   if (!imageName || useFallbackResultImage.value) return fallbackResultImage
   return `${RESULT_IMAGE_BASE_DIR}/${encodeURIComponent(imageName)}`
 })
@@ -190,6 +103,21 @@ const resultScoreCards = computed(() => {
   ]
 })
 
+const formatDateTime = (date) => {
+  if (!date) return '--'
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hour = String(date.getHours()).padStart(2, '0')
+  const minute = String(date.getMinutes()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hour}:${minute}`
+}
+
+const generatedAtLabel = computed(() => formatDateTime(resultGeneratedAt.value))
+const descriptionHeading = computed(() => `最擅长${finalResultData.value?.title || '自我进化'}的类型`)
+
 const jumpToFirstUnanswered = () => {
   const firstUnansweredIndex = quizQuestions.findIndex((q) => !userState.answers[q.id])
   currentQuestionIndex.value = firstUnansweredIndex === -1 ? 0 : firstUnansweredIndex
@@ -207,6 +135,7 @@ const pickDimensionWinner = (aCode, aScore, bCode, bScore, questionIds) => {
   return aCode
 }
 
+// 计算结果的核心函数，遍历用户的每个回答，根据题目所属维度和选项权重累加分数，最后根据得分情况确定每个维度的胜出类型。
 const calculateResult = () => {
   if (!isAllAnswered.value) return
 
@@ -247,12 +176,13 @@ const calculateResult = () => {
     actionWinner
   }
 
+  // 将四个维度的胜出类型字母组合成最终结果码，例如 "ESTJ"。
   finalResultCode.value = [energyWinner, informationWinner, decisionWinner, actionWinner].join('')
+  resultGeneratedAt.value = new Date()
   currentStep.value = PAGE_STATE.RESULT
 }
 
 const startQuiz = () => {
-  if (!userState.college) return
   jumpToFirstUnanswered()
   currentStep.value = PAGE_STATE.QUIZ
 }
@@ -300,6 +230,7 @@ const restartQuiz = () => {
   userState.answers = {}
   finalResultCode.value = ''
   finalDimensionScores.value = null
+  resultGeneratedAt.value = null
   posterImageBase64.value = ''
   posterError.value = ''
   currentQuestionIndex.value = 0
@@ -321,8 +252,9 @@ const withTimeout = (promise, timeoutMs) =>
       })
   })
 
+  // 生成海报的函数，使用 html2canvas 将指定 DOM 节点渲染成画布，并转换为 Base64 图片数据。函数内包含重试机制和错误处理，以提高生成成功率和用户体验。
 const generatePoster = async () => {
-  if (!posterNode.value || !resultData.value) return false
+  if (!posterNode.value || !finalResultData.value) return false
 
   isGeneratingPoster.value = true
   posterError.value = ''
@@ -366,7 +298,7 @@ const downloadPoster = async () => {
     if (!generated) return
   }
 
-  const fileName = `${selectedCollegeLabel.value}-${finalResultKey.value}-鉴定海报.png`
+  const fileName = `${finalResultKey.value}-鉴定海报.png`
   const link = document.createElement('a')
   link.href = posterImageBase64.value
   link.download = fileName
@@ -377,7 +309,7 @@ const downloadPoster = async () => {
 
 const shareResult = async () => {
   const shareTitle = `我的精神状态鉴定：${finalResultKey.value}`
-  const shareText = `${selectedCollegeLabel.value}的我测出了 ${finalResultKey.value}（${resultData.value?.title || '神秘人格'}）。来测测你是啥物种！`
+  const shareText = `我测出了 ${finalResultKey.value}（${finalResultData.value?.title || '神秘人格'}）。来测测你是啥物种！`
   const shareUrl = window.location.href
 
   shareFeedback.value = ''
@@ -424,6 +356,7 @@ watch(
     }
 
     if (step === PAGE_STATE.RESULT) {
+      posterImageBase64.value = ''
       await nextTick()
       await generatePoster()
     }
@@ -431,7 +364,7 @@ watch(
 )
 
 watch(
-  () => resultData.value?.image,
+  () => finalResultData.value?.image,
   () => {
     useFallbackResultImage.value = false
   }
@@ -443,11 +376,11 @@ onMounted(() => {
 
   currentStep.value = PAGE_STATE.HOME
   currentQuestionIndex.value = 0
-  userState.college = ''
   userState.answers = {}
 
   finalResultCode.value = ''
   finalDimensionScores.value = null
+  resultGeneratedAt.value = null
   posterImageBase64.value = ''
   posterError.value = ''
   shareFeedback.value = ''
@@ -477,35 +410,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="mt-8">
-          <label for="college-select" class="mb-3 block text-sm font-semibold tracking-wide text-slate-600">
-            选择你的学院
-          </label>
-          <select id="college-select" v-model="userState.college" class="glass-input">
-            <option value="">-- 选择学院 --</option>
-            <option value="governance">政治学与公共管理学院</option>
-            <option value="law">法学院</option>
-            <option value="ise">信息科学与工程学院</option>
-            <option value="cs">计算机科学与技术学院</option>
-            <option value="life">生命科学学院</option>
-            <option value="environment">环境科学与工程学院</option>
-            <option value="cybersecurity">网络空间安全学院（研究院）</option>
-            <option value="iit">国际创新转化学院</option>
-          </select>
-        </div>
-
         <button
           @click="startQuiz"
-          :disabled="!userState.college"
           class="cta-primary mt-8 w-full py-4 text-lg font-semibold"
-          :class="!userState.college ? 'is-disabled' : ''"
         >
           开始鉴定
         </button>
-
-        <p v-if="!userState.college" class="hint-text mt-4 text-center text-sm">
-          请先选择学院，再开始测试
-        </p>
       </section>
     </div>
   </div>
@@ -574,150 +484,157 @@ onMounted(() => {
     </div>
   </div>
 
-  <div v-else-if="currentStep === PAGE_STATE.RESULT" class="app-shell min-h-screen px-4 py-8">
-    <div class="bg-orb orb-b" />
-    <div class="bg-orb orb-c" />
+  <div
+    v-else-if="currentStep === PAGE_STATE.RESULT"
+    class="relative min-h-screen overflow-hidden bg-slate-50 py-8"
+  >
+    <div
+      class="pointer-events-none absolute -left-24 -top-28 h-[28rem] w-[28rem] rounded-full opacity-10 blur-[100px]"
+      :style="{ backgroundColor: finalResultData?.themeColor }"
+    />
+    <div
+      class="pointer-events-none absolute -bottom-28 -right-20 h-[30rem] w-[30rem] rounded-full opacity-10 blur-[100px]"
+      :style="{ backgroundColor: finalResultData?.themeColor }"
+    />
 
-    <div class="content-wrap mx-auto w-full max-w-md">
-      <header class="glass-card reveal reveal-1 p-5 text-center">
-        <p class="eyebrow">YOUR REPORT</p>
-        <h2 class="text-2xl font-bold text-slate-900">你的专属鉴定报告</h2>
-        <p class="mt-1 text-sm font-semibold text-slate-600">MBTI：{{ finalResultCode }} · 英文代号：{{ finalResultKey }}</p>
-        <p class="mt-2 text-base font-bold text-slate-900">中文称号：{{ resultData?.title }}</p>
-        <p v-if="!isMappedResult" class="mt-2 text-xs font-semibold text-rose-600">结果码未命中字典，已使用兜底类型。</p>
+    <div class="relative z-10 mx-auto w-full max-w-3xl">
+      <header class="px-4 text-center">
+        <p class="text-base font-semibold text-gray-800">你的专属鉴定报告已生成</p>
+        <p class="mt-1 text-xs text-gray-400">生成于：{{ generatedAtLabel }}</p>
       </header>
 
-      <section class="glass-card reveal reveal-2 mt-4 p-4">
-        <div class="relative mx-auto w-full max-w-[22rem]">
-          <div class="pointer-events-none absolute inset-x-8 -bottom-5 h-16 rounded-full bg-zinc-900/45 opacity-40 blur-2xl" />
-
-          <div class="relative isolate aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-900/50 p-2 ring-1 ring-white/10 shadow-2xl shadow-black/50 backdrop-blur-md">
+      <section class="mx-4 mt-5 rounded-3xl bg-white p-6 shadow-lg">
+        <div class="flex items-center gap-5">
+          <div class="w-2/5">
             <img
               :src="resultImageSrc"
-              :alt="`${resultData?.title || finalResultKey} 人格形象`"
-              class="h-full w-full rounded-xl object-cover object-center mix-blend-screen"
+              :alt="`${finalResultData?.title || finalResultCode} 人格形象`"
+              class="h-auto w-full object-contain mix-blend-multiply"
               @error="handleResultImageError"
             />
           </div>
-        </div>
-      </section>
 
-      <section v-if="resultScoreCards.length" class="glass-card reveal reveal-2 mt-4 p-4">
-        <h3 class="text-base font-bold text-slate-900">四维得分明细</h3>
-
-        <div class="mt-3 space-y-3">
-          <div v-for="item in resultScoreCards" :key="item.label">
-            <div class="mb-1 flex items-center justify-between text-xs font-semibold text-slate-600">
-              <span>{{ item.left }} {{ item.leftScore }}</span>
-              <span>{{ item.label }} · 判定 {{ item.winner }}</span>
-              <span>{{ item.right }} {{ item.rightScore }}</span>
-            </div>
-
-            <div class="h-2 overflow-hidden rounded-full bg-slate-200/85">
-              <div class="h-2 rounded-full bg-gradient-to-r from-slate-600 to-slate-800" :style="{ width: `${item.leftRatio}%` }" />
-            </div>
+          <div class="w-3/5">
+            <p class="text-xs text-gray-500">你的测试类型</p>
+            <h2 class="mt-1 text-5xl font-black leading-none text-gray-900">{{ finalResultCode }}</h2>
+            <p class="mt-2 text-xl font-bold" :style="{ color: finalResultData?.themeColor }">{{ finalResultData?.title }}</p>
+            <p v-if="!isMappedResult" class="mt-2 text-xs font-semibold text-rose-600">结果码未命中字典，已使用兜底类型。</p>
           </div>
         </div>
+
+        <section v-if="resultScoreCards.length" class="mt-8">
+          <h3 class="mb-4 text-lg font-bold text-gray-900">类型数据</h3>
+
+          <div class="space-y-4">
+            <div v-for="item in resultScoreCards" :key="item.label">
+              <div class="flex justify-between text-xs font-bold text-slate-500">
+                <span>{{ item.left }} {{ item.leftRatio }}%</span>
+                <span>{{ 100 - item.leftRatio }}% {{ item.right }}</span>
+              </div>
+
+              <div class="mt-2 h-1.5 rounded-full" :style="{ backgroundColor: finalResultData?.themeColor + '20' }">
+                <div
+                  class="h-1.5 rounded-full"
+                  :style="{ backgroundColor: finalResultData?.themeColor, width: `${item.leftRatio}%` }"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mt-8 border-t border-gray-100 pt-6">
+          <p class="text-sm font-semibold" :style="{ color: finalResultData?.themeColor }">{{ descriptionHeading }}</p>
+          <p class="mt-3 text-justify text-sm leading-relaxed text-gray-700">
+            {{ finalResultData?.description || '结果描述生成中...' }}
+          </p>
+        </section>
       </section>
 
-      <section class="glass-card reveal reveal-3 mt-4 overflow-hidden p-2">
-        <img v-if="posterImageBase64" :src="posterImageBase64" alt="人格测试海报" class="block h-auto w-full rounded-2xl" />
-        <div v-else class="loading-panel flex h-80 flex-col items-center justify-center rounded-2xl px-6 text-center text-sm font-semibold text-slate-600">
-          <span class="loading-ring" />
-          {{ isGeneratingPoster ? '正在生成海报...' : '海报准备中，请稍候...' }}
+      <div class="mx-4 mt-4">
+        <p class="text-center text-sm font-semibold text-gray-500">
+          {{ isGeneratingPoster ? '海报生成中，请稍候...' : '海报已准备好，可直接下载或分享' }}
+        </p>
+        <p v-if="posterError" class="mt-2 text-center text-sm font-semibold text-rose-600">{{ posterError }}</p>
+
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <button type="button" @click="generatePoster" :disabled="isGeneratingPoster" class="cta-primary py-3" :class="isGeneratingPoster ? 'is-disabled' : ''">
+            {{ isGeneratingPoster ? '生成中...' : '重新生成海报' }}
+          </button>
+          <button type="button" @click="downloadPoster" :disabled="isGeneratingPoster" class="cta-ghost py-3" :class="isGeneratingPoster ? 'is-disabled' : ''">
+            下载海报
+          </button>
         </div>
-      </section>
 
-      <p class="mt-4 text-center text-sm font-semibold text-slate-600">长按上方图片保存到手机</p>
-      <p v-if="posterError" class="mt-2 text-center text-sm font-semibold text-rose-600">{{ posterError }}</p>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            @click="shareResult"
+            :disabled="isGeneratingPoster"
+            class="cta-accent py-3"
+            :style="{ backgroundColor: finalResultData?.themeColor }"
+            :class="isGeneratingPoster ? 'is-disabled' : ''"
+          >
+            分享结果
+          </button>
+          <button type="button" @click="restartQuiz" class="cta-soft py-3">再测一次</button>
+        </div>
 
-      <div class="mt-4 grid grid-cols-2 gap-3">
-        <button type="button" @click="generatePoster" :disabled="isGeneratingPoster" class="cta-primary py-3" :class="isGeneratingPoster ? 'is-disabled' : ''">
-          {{ isGeneratingPoster ? '生成中...' : '重新生成海报' }}
-        </button>
-        <button type="button" @click="downloadPoster" :disabled="isGeneratingPoster" class="cta-ghost py-3" :class="isGeneratingPoster ? 'is-disabled' : ''">
-          下载海报
-        </button>
+        <p v-if="shareFeedback" class="mt-3 text-center text-sm font-semibold text-gray-500">{{ shareFeedback }}</p>
       </div>
-
-      <div class="mt-3 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          @click="shareResult"
-          :disabled="isGeneratingPoster"
-          class="cta-accent py-3"
-          :style="{ backgroundColor: currentTheme.actionColor }"
-          :class="isGeneratingPoster ? 'is-disabled' : ''"
-        >
-          分享结果
-        </button>
-        <button type="button" @click="restartQuiz" class="cta-soft py-3">再测一次</button>
-      </div>
-
-      <p v-if="shareFeedback" class="mt-3 text-center text-sm font-semibold text-slate-600">{{ shareFeedback }}</p>
     </div>
 
     <div class="absolute -left-[9999px] top-0">
-      <div
-        ref="posterNode"
-        class="poster-canvas relative w-[390px] overflow-hidden rounded-2xl border-4 p-8 text-black"
-        :style="{ backgroundImage: currentTheme.posterGradient, borderColor: currentTheme.borderColor }"
-      >
-        <div class="poster-blob poster-blob-a" />
-        <div class="poster-blob poster-blob-b" />
+      <div ref="posterNode" class="w-[390px] bg-gray-50 p-4">
+        <header class="text-center">
+          <p class="text-[15px] font-semibold text-gray-800">你的专属鉴定报告已生成</p>
+          <p class="mt-1 text-[10px] text-gray-400">生成于：{{ generatedAtLabel }}</p>
+        </header>
 
-        <div class="relative z-10">
-          <p class="text-base font-black">{{ selectedCollegeLabel }} 专属鉴定报告</p>
-
-          <h1 class="mt-6 w-full break-words text-center text-6xl font-black uppercase leading-none tracking-tight">
-            {{ posterMainTitle }}
-          </h1>
-
-          <p class="mt-3 w-full text-center text-xl font-black">
-            {{ resultData?.title }}
-          </p>
-
-          <div class="relative mx-auto mt-6 w-full max-w-[320px]">
-            <div class="pointer-events-none absolute inset-x-6 -bottom-4 h-14 rounded-full bg-zinc-900/45 opacity-40 blur-2xl" />
-
-            <div class="relative isolate aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-900/55 p-2 ring-1 ring-white/10 shadow-2xl shadow-black/50 backdrop-blur-md">
+        <section class="mt-4 rounded-3xl bg-white p-6 shadow-lg">
+          <div class="flex items-center gap-4">
+            <div class="w-2/5">
               <img
                 :src="resultImageSrc"
                 :alt="`${posterMainTitle} 人格形象`"
-                class="h-full w-full rounded-xl object-cover object-center mix-blend-screen"
+                class="h-auto w-full object-contain mix-blend-multiply"
                 @error="handleResultImageError"
               />
             </div>
+
+            <div class="w-3/5">
+              <p class="text-[11px] text-gray-500">你的测试类型</p>
+              <h1 class="mt-1 text-[48px] font-black leading-none text-gray-900">{{ finalResultCode }}</h1>
+              <p class="mt-2 text-[20px] font-bold" :style="{ color: finalResultData?.themeColor }">{{ finalResultData?.title }}</p>
+            </div>
           </div>
 
-          <div style="margin-top: 24px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px;">
-            <span
-              v-for="(tag, idx) in (resultData?.tags || []).slice(0, 3)"
-              :key="`${idx}-${tag}`"
-              :style="{
-                display: 'inline-block',
-                background: currentTheme.tagBg,
-                color: currentTheme.tagColor,
-                height: '40px',
-                lineHeight: '40px',
-                maxWidth: '100%',
-                padding: '0 18px',
-                borderRadius: '999px',
-                whiteSpace: 'nowrap',
-                fontSize: '14px',
-                fontWeight: '700',
-                verticalAlign: 'top',
-                boxSizing: 'border-box'
-              }"
-            >
-              {{ tag }}
-            </span>
-          </div>
+          <section v-if="resultScoreCards.length" class="mt-8">
+            <h3 class="mb-4 text-[19px] font-bold text-gray-900">类型数据</h3>
 
-          <p class="mt-8 text-base font-semibold leading-relaxed">
-            {{ resultData?.description || '结果描述生成中...' }}
-          </p>
-        </div>
+            <div class="space-y-4">
+              <div v-for="item in resultScoreCards" :key="`poster-${item.label}`">
+                <div class="flex justify-between text-[12px] text-gray-700">
+                  <span>{{ item.left }} {{ item.leftRatio }}%</span>
+                  <span>{{ 100 - item.leftRatio }}% {{ item.right }}</span>
+                </div>
+
+                <div class="mt-2 h-2 rounded-full bg-gray-200">
+                  <div
+                    class="h-2 rounded-full"
+                    :style="{ backgroundColor: finalResultData?.themeColor, width: `${item.leftRatio}%` }"
+                  />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="mt-8 border-t border-gray-100 pt-6">
+            <p class="text-[13px] font-semibold" :style="{ color: finalResultData?.themeColor }">{{ descriptionHeading }}</p>
+            <p class="mt-3 text-justify text-[13px] leading-relaxed text-gray-700">
+              {{ finalResultData?.description || '结果描述生成中...' }}
+            </p>
+          </section>
+        </section>
       </div>
     </div>
   </div>
@@ -857,29 +774,6 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.hint-text {
-  color: var(--pf-text-soft);
-}
-
-.glass-input {
-  width: 100%;
-  appearance: none;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 16px;
-  background: var(--pf-surface-strong);
-  color: var(--pf-text);
-  font-size: 15px;
-  font-weight: 600;
-  padding: 13px 14px;
-  transition: all 0.25s var(--pf-ease);
-}
-
-.glass-input:focus {
-  outline: none;
-  border-color: rgba(148, 163, 184, 0.78);
-  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.18);
-}
-
 .option-btn {
   width: 100%;
   border-radius: 18px;
@@ -962,33 +856,6 @@ onMounted(() => {
   opacity: 0.46;
   box-shadow: none;
   pointer-events: none;
-}
-
-.poster-canvas {
-  box-shadow: var(--pf-shadow-sm);
-}
-
-.poster-blob {
-  position: absolute;
-  border-radius: 999px;
-  filter: blur(22px);
-  opacity: 0.45;
-}
-
-.poster-blob-a {
-  top: -32px;
-  right: -12px;
-  width: 120px;
-  height: 120px;
-  background: rgba(255, 255, 255, 0.5);
-}
-
-.poster-blob-b {
-  bottom: -26px;
-  left: -20px;
-  width: 140px;
-  height: 140px;
-  background: rgba(255, 255, 255, 0.38);
 }
 
 .reveal {
